@@ -1,15 +1,41 @@
 import os
+import sys
 import sqlite3
 import secrets
 import string
 import time
-import tkinter as tk
-from tkinter import ttk, messagebox
 from datetime import datetime
+
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.exceptions import InvalidTag
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QWidget,
+    QStackedWidget,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QHBoxLayout,
+    QFormLayout,
+    QFrame,
+    QRadioButton,
+    QButtonGroup,
+    QCheckBox,
+    QSpinBox,
+    QComboBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QHeaderView,
+    QMessageBox,
+    QAbstractItemView,
+    QProgressBar,
+)
 
 CATEGORIES = ("Personal", "Professional")
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vault.db")
@@ -18,15 +44,237 @@ PBKDF2_ITERATIONS = 390000
 SALT_SIZE = 16
 KEY_SIZE = 32
 
-COLOR_BACKGROUND = "#000000"
-COLOR_TEXT = "#FFFFFF"
-COLOR_FIELD_BACKGROUND = "#0D0D0D"
-COLOR_BORDER = "#3A3A3A"
-COLOR_ACCENT = "#1A1A1A"
-COLOR_HOVER = "#262626"
-COLOR_ERROR = "#FF5555"
-COLOR_SUCCESS = "#55FF88"
-COLOR_MEDIUM = "#FFC107"
+BG = "#0E0C0A"
+SURFACE = "#17140F"
+SURFACE_ALT = "#1D1913"
+BORDER = "#332D22"
+FOCUS = "#C9A15C"
+TEXT_PRIMARY = "#F2EFE7"
+TEXT_SECONDARY = "#948B78"
+ACCENT = "#C9A15C"
+ACCENT_HOVER = "#D9B571"
+ACCENT_PRESSED = "#B48D4C"
+ACCENT_TEXT = "#14110A"
+SUCCESS = "#7FC29B"
+ERROR = "#E0645A"
+WARNING = "#E0B04D"
+
+SANS_FONT = "'Segoe UI', 'Inter', 'Helvetica Neue', sans-serif"
+MONO_FONT = "'Cascadia Code', 'Consolas', 'JetBrains Mono', monospace"
+
+STYLE_SHEET = """
+QMainWindow, QWidget {{
+    background-color: {BG};
+    color: {TEXT_PRIMARY};
+    font-family: {SANS_FONT};
+    font-size: 10pt;
+}}
+QFrame#card {{
+    background-color: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 14px;
+}}
+QFrame#topBar {{
+    background-color: {SURFACE};
+    border-bottom: 1px solid {BORDER};
+}}
+QFrame#leftPanel {{
+    background-color: {SURFACE};
+    border: 1px solid {BORDER};
+    border-radius: 14px;
+}}
+QFrame#hline {{
+    background-color: {BORDER};
+    max-height: 1px;
+    min-height: 1px;
+    border: none;
+}}
+QLabel#brand {{
+    font-size: 21pt;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: {TEXT_PRIMARY};
+}}
+QLabel#tagline {{
+    color: {TEXT_SECONDARY};
+    font-size: 9pt;
+}}
+QLabel#sectionTitle {{
+    font-size: 11pt;
+    font-weight: 700;
+    color: {ACCENT};
+    letter-spacing: 1px;
+}}
+QLabel#fieldLabel {{
+    color: {TEXT_SECONDARY};
+    font-size: 9pt;
+    font-weight: 600;
+}}
+QLabel#userLabel {{
+    color: {TEXT_PRIMARY};
+    font-weight: 600;
+}}
+QLabel#emptyState {{
+    color: {TEXT_SECONDARY};
+    font-size: 10pt;
+}}
+QLineEdit, QSpinBox, QComboBox {{
+    background-color: {SURFACE_ALT};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+    padding: 8px 10px;
+    color: {TEXT_PRIMARY};
+    selection-background-color: {ACCENT};
+    selection-color: {ACCENT_TEXT};
+}}
+QLineEdit:focus, QSpinBox:focus, QComboBox:focus {{
+    border: 1px solid {FOCUS};
+}}
+QLineEdit:read-only {{
+    color: {TEXT_SECONDARY};
+}}
+QLineEdit#idField, QLineEdit#passwordField {{
+    font-family: {MONO_FONT};
+    letter-spacing: 1px;
+}}
+QPushButton {{
+    background-color: {SURFACE_ALT};
+    border: 1px solid {BORDER};
+    border-radius: 8px;
+    padding: 9px 16px;
+    color: {TEXT_PRIMARY};
+    font-weight: 600;
+}}
+QPushButton:hover {{
+    background-color: #241F17;
+    border: 1px solid #453D2C;
+}}
+QPushButton:pressed {{
+    background-color: {SURFACE};
+}}
+QPushButton[primary="true"] {{
+    background-color: {ACCENT};
+    border: 1px solid {ACCENT};
+    color: {ACCENT_TEXT};
+}}
+QPushButton[primary="true"]:hover {{
+    background-color: {ACCENT_HOVER};
+    border: 1px solid {ACCENT_HOVER};
+}}
+QPushButton[primary="true"]:pressed {{
+    background-color: {ACCENT_PRESSED};
+    border: 1px solid {ACCENT_PRESSED};
+}}
+QPushButton[compact="true"] {{
+    padding: 6px 12px;
+    font-size: 9pt;
+}}
+QPushButton[ghost="true"] {{
+    background-color: transparent;
+    border: 1px solid {BORDER};
+    color: {TEXT_SECONDARY};
+}}
+QPushButton[ghost="true"]:hover {{
+    color: {TEXT_PRIMARY};
+    border: 1px solid #453D2C;
+}}
+QRadioButton, QCheckBox {{
+    color: {TEXT_PRIMARY};
+    spacing: 8px;
+    font-size: 10pt;
+}}
+QRadioButton::indicator, QCheckBox::indicator {{
+    width: 15px;
+    height: 15px;
+    border: 1px solid #4A4230;
+    background-color: {SURFACE_ALT};
+}}
+QRadioButton::indicator {{
+    border-radius: 8px;
+}}
+QCheckBox::indicator {{
+    border-radius: 4px;
+}}
+QRadioButton::indicator:checked, QCheckBox::indicator:checked {{
+    background-color: {ACCENT};
+    border: 1px solid {ACCENT};
+}}
+QTableWidget {{
+    background-color: {SURFACE};
+    alternate-background-color: {SURFACE_ALT};
+    gridline-color: {BORDER};
+    border: 1px solid {BORDER};
+    border-radius: 14px;
+    color: {TEXT_PRIMARY};
+    selection-background-color: #3A3115;
+    selection-color: {TEXT_PRIMARY};
+}}
+QHeaderView::section {{
+    background-color: {SURFACE};
+    color: {TEXT_SECONDARY};
+    padding: 10px;
+    border: none;
+    border-bottom: 1px solid {BORDER};
+    font-weight: 600;
+    font-size: 9pt;
+}}
+QTableWidget::item {{
+    padding: 6px;
+    border-bottom: 1px solid {BORDER};
+}}
+QComboBox::drop-down {{
+    border: none;
+    width: 24px;
+}}
+QComboBox QAbstractItemView {{
+    background-color: {SURFACE_ALT};
+    color: {TEXT_PRIMARY};
+    border: 1px solid {BORDER};
+    selection-background-color: {ACCENT};
+    selection-color: {ACCENT_TEXT};
+    outline: none;
+}}
+QProgressBar {{
+    background-color: {SURFACE_ALT};
+    border: 1px solid {BORDER};
+    border-radius: 4px;
+    max-height: 6px;
+    min-height: 6px;
+}}
+QProgressBar::chunk {{
+    border-radius: 3px;
+}}
+QScrollBar:vertical {{
+    background: {BG};
+    width: 11px;
+    margin: 0;
+}}
+QScrollBar::handle:vertical {{
+    background: {BORDER};
+    border-radius: 5px;
+    min-height: 24px;
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0px;
+}}
+QMessageBox {{
+    background-color: {SURFACE};
+}}
+""".format(
+    BG=BG,
+    SURFACE=SURFACE,
+    SURFACE_ALT=SURFACE_ALT,
+    BORDER=BORDER,
+    FOCUS=FOCUS,
+    TEXT_PRIMARY=TEXT_PRIMARY,
+    TEXT_SECONDARY=TEXT_SECONDARY,
+    ACCENT=ACCENT,
+    ACCENT_HOVER=ACCENT_HOVER,
+    ACCENT_PRESSED=ACCENT_PRESSED,
+    ACCENT_TEXT=ACCENT_TEXT,
+    SANS_FONT=SANS_FONT,
+    MONO_FONT=MONO_FONT,
+)
 
 
 class CryptoEngine:
@@ -187,359 +435,464 @@ class Database:
         self.connection.commit()
 
 
-def create_button(parent, text, command, width=18):
-    return tk.Button(
-        parent,
-        text=text,
-        command=command,
-        width=width,
-        bg=COLOR_ACCENT,
-        fg=COLOR_TEXT,
-        activebackground=COLOR_HOVER,
-        activeforeground=COLOR_TEXT,
-        relief="flat",
-        bd=1,
-        highlightbackground=COLOR_BORDER,
-        highlightthickness=1,
-        cursor="hand2",
-        font=("Segoe UI", 10),
-    )
+def make_label(text, object_name=None):
+    label = QLabel(text)
+    if object_name:
+        label.setObjectName(object_name)
+    return label
 
 
-def create_field(parent, width=30, show=None):
-    field = tk.Entry(
-        parent,
-        width=width,
-        bg=COLOR_FIELD_BACKGROUND,
-        fg=COLOR_TEXT,
-        insertbackground=COLOR_TEXT,
-        relief="flat",
-        highlightthickness=1,
-        highlightbackground=COLOR_BORDER,
-        highlightcolor=COLOR_TEXT,
-        font=("Segoe UI", 10),
-    )
-    if show is not None:
-        field.configure(show=show)
+def make_field(password=False, object_name=None):
+    field = QLineEdit()
+    if password:
+        field.setEchoMode(QLineEdit.Password)
+    if object_name:
+        field.setObjectName(object_name)
     return field
 
 
-def create_label(parent, text, size=10, bold=False):
-    font = ("Segoe UI", size, "bold") if bold else ("Segoe UI", size)
-    return tk.Label(parent, text=text, bg=COLOR_BACKGROUND, fg=COLOR_TEXT, font=font)
+def make_button(text, primary=False, compact=False, ghost=False):
+    button = QPushButton(text)
+    button.setCursor(Qt.PointingHandCursor)
+    if primary:
+        button.setProperty("primary", "true")
+    if compact:
+        button.setProperty("compact", "true")
+    if ghost:
+        button.setProperty("ghost", "true")
+    return button
 
 
-class LoginScreen(tk.Frame):
+def make_separator():
+    line = QFrame()
+    line.setObjectName("hline")
+    line.setFixedHeight(1)
+    return line
 
-    def __init__(self, parent, controller):
-        super().__init__(parent, bg=COLOR_BACKGROUND)
+
+class LoginScreen(QWidget):
+
+    def __init__(self, controller):
+        super().__init__()
         self.controller = controller
-        container = tk.Frame(self, bg=COLOR_BACKGROUND)
-        container.place(relx=0.5, rely=0.5, anchor="center")
 
-        create_label(container, "PASSWORD MANAGER", 18, True).grid(row=0, column=0, columnspan=2, pady=(0, 30))
-        create_label(container, "Username").grid(row=1, column=0, sticky="w", pady=8, padx=5)
-        self.username_field = create_field(container, 32)
-        self.username_field.grid(row=1, column=1, pady=8, padx=5)
+        outer = QVBoxLayout(self)
+        outer.setAlignment(Qt.AlignCenter)
 
-        create_label(container, "Master password").grid(row=2, column=0, sticky="w", pady=8, padx=5)
-        self.password_field = create_field(container, 32, show="*")
-        self.password_field.grid(row=2, column=1, pady=8, padx=5)
+        card = QFrame()
+        card.setObjectName("card")
+        card.setFixedWidth(420)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(40, 40, 40, 36)
+        card_layout.setSpacing(2)
 
-        self.message_label = tk.Label(container, text="", bg=COLOR_BACKGROUND, fg=COLOR_ERROR, font=("Segoe UI", 9))
-        self.message_label.grid(row=3, column=0, columnspan=2, pady=5)
+        brand = make_label("VAULT", "brand")
+        brand.setAlignment(Qt.AlignCenter)
+        tagline = make_label("Encrypted password manager", "tagline")
+        tagline.setAlignment(Qt.AlignCenter)
+        card_layout.addWidget(brand)
+        card_layout.addWidget(tagline)
+        card_layout.addSpacing(30)
 
-        create_button(container, "Login", self.attempt_login, 34).grid(row=4, column=0, columnspan=2, pady=(15, 5))
-        create_button(container, "Create an account", self.go_to_register, 34).grid(row=5, column=0, columnspan=2, pady=5)
+        form = QFormLayout()
+        form.setSpacing(14)
+        form.setLabelAlignment(Qt.AlignLeft)
 
-        self.password_field.bind("<Return>", lambda event: self.attempt_login())
+        self.username_field = make_field()
+        self.password_field = make_field(password=True)
+
+        form.addRow(make_label("Username", "fieldLabel"), self.username_field)
+        form.addRow(make_label("Master password", "fieldLabel"), self.password_field)
+        card_layout.addLayout(form)
+
+        self.message_label = make_label("", "errorLabel")
+        self.message_label.setStyleSheet("color: " + ERROR + ";")
+        self.message_label.setAlignment(Qt.AlignCenter)
+        self.message_label.setWordWrap(True)
+        card_layout.addSpacing(8)
+        card_layout.addWidget(self.message_label)
+
+        login_button = make_button("Login", primary=True)
+        login_button.clicked.connect(self.attempt_login)
+        register_button = make_button("Create an account", ghost=True)
+        register_button.clicked.connect(self.go_to_register)
+
+        card_layout.addSpacing(10)
+        card_layout.addWidget(login_button)
+        card_layout.addSpacing(8)
+        card_layout.addWidget(register_button)
+
+        outer.addWidget(card)
+
+        self.password_field.returnPressed.connect(self.attempt_login)
+        self.username_field.returnPressed.connect(self.password_field.setFocus)
 
     def attempt_login(self):
-        username = self.username_field.get().strip()
-        password = self.password_field.get()
+        username = self.username_field.text().strip()
+        password = self.password_field.text()
         if not username or not password:
-            self.message_label.configure(text="Please fill in all fields")
+            self.message_label.setText("Please fill in all fields")
             return
         success, message = self.controller.login(username, password)
         if not success:
-            self.message_label.configure(text=message)
-            self.password_field.delete(0, tk.END)
+            self.message_label.setText(message)
+            self.password_field.clear()
 
     def go_to_register(self):
         self.reset()
-        self.controller.show_screen("RegisterScreen")
+        self.controller.show_screen("register")
 
     def reset(self):
-        self.username_field.delete(0, tk.END)
-        self.password_field.delete(0, tk.END)
-        self.message_label.configure(text="")
+        self.username_field.clear()
+        self.password_field.clear()
+        self.message_label.setText("")
 
 
-class RegisterScreen(tk.Frame):
+class RegisterScreen(QWidget):
 
-    def __init__(self, parent, controller):
-        super().__init__(parent, bg=COLOR_BACKGROUND)
+    def __init__(self, controller):
+        super().__init__()
         self.controller = controller
-        container = tk.Frame(self, bg=COLOR_BACKGROUND)
-        container.place(relx=0.5, rely=0.5, anchor="center")
 
-        create_label(container, "CREATE ACCOUNT", 18, True).grid(row=0, column=0, columnspan=2, pady=(0, 30))
-        create_label(container, "Username").grid(row=1, column=0, sticky="w", pady=8, padx=5)
-        self.username_field = create_field(container, 32)
-        self.username_field.grid(row=1, column=1, pady=8, padx=5)
+        outer = QVBoxLayout(self)
+        outer.setAlignment(Qt.AlignCenter)
 
-        create_label(container, "Master password").grid(row=2, column=0, sticky="w", pady=8, padx=5)
-        self.password_field = create_field(container, 32, show="*")
-        self.password_field.grid(row=2, column=1, pady=8, padx=5)
+        card = QFrame()
+        card.setObjectName("card")
+        card.setFixedWidth(420)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(40, 40, 40, 36)
+        card_layout.setSpacing(2)
 
-        create_label(container, "Confirm password").grid(row=3, column=0, sticky="w", pady=8, padx=5)
-        self.confirm_field = create_field(container, 32, show="*")
-        self.confirm_field.grid(row=3, column=1, pady=8, padx=5)
+        brand = make_label("CREATE ACCOUNT", "brand")
+        brand.setAlignment(Qt.AlignCenter)
+        tagline = make_label("Your master password encrypts everything", "tagline")
+        tagline.setAlignment(Qt.AlignCenter)
+        card_layout.addWidget(brand)
+        card_layout.addWidget(tagline)
+        card_layout.addSpacing(30)
 
-        self.message_label = tk.Label(container, text="", bg=COLOR_BACKGROUND, fg=COLOR_ERROR, font=("Segoe UI", 9))
-        self.message_label.grid(row=4, column=0, columnspan=2, pady=5)
+        form = QFormLayout()
+        form.setSpacing(14)
+        form.setLabelAlignment(Qt.AlignLeft)
 
-        create_button(container, "Create account", self.attempt_register, 34).grid(row=5, column=0, columnspan=2, pady=(15, 5))
-        create_button(container, "Back to login", self.go_to_login, 34).grid(row=6, column=0, columnspan=2, pady=5)
+        self.username_field = make_field()
+        self.password_field = make_field(password=True)
+        self.confirm_field = make_field(password=True)
+
+        form.addRow(make_label("Username", "fieldLabel"), self.username_field)
+        form.addRow(make_label("Master password", "fieldLabel"), self.password_field)
+        form.addRow(make_label("Confirm password", "fieldLabel"), self.confirm_field)
+        card_layout.addLayout(form)
+
+        self.message_label = make_label("", "errorLabel")
+        self.message_label.setStyleSheet("color: " + ERROR + ";")
+        self.message_label.setAlignment(Qt.AlignCenter)
+        self.message_label.setWordWrap(True)
+        card_layout.addSpacing(8)
+        card_layout.addWidget(self.message_label)
+
+        create_account_button = make_button("Create account", primary=True)
+        create_account_button.clicked.connect(self.attempt_register)
+        back_button = make_button("Back to login", ghost=True)
+        back_button.clicked.connect(self.go_to_login)
+
+        card_layout.addSpacing(10)
+        card_layout.addWidget(create_account_button)
+        card_layout.addSpacing(8)
+        card_layout.addWidget(back_button)
+
+        outer.addWidget(card)
+
+        self.confirm_field.returnPressed.connect(self.attempt_register)
 
     def attempt_register(self):
-        username = self.username_field.get().strip()
-        password = self.password_field.get()
-        confirm = self.confirm_field.get()
+        username = self.username_field.text().strip()
+        password = self.password_field.text()
+        confirm = self.confirm_field.text()
         if not username or not password or not confirm:
-            self.message_label.configure(text="Please fill in all fields")
+            self.message_label.setText("Please fill in all fields")
             return
         if len(password) < 8:
-            self.message_label.configure(text="Password must contain at least 8 characters")
+            self.message_label.setText("Password must contain at least 8 characters")
             return
         if password != confirm:
-            self.message_label.configure(text="Passwords do not match")
+            self.message_label.setText("Passwords do not match")
             return
         success, message = self.controller.register(username, password)
         if success:
             self.reset()
-            messagebox.showinfo("Account created", "Your account has been created successfully")
-            self.controller.show_screen("LoginScreen")
+            QMessageBox.information(self, "Account created", "Your account has been created successfully")
+            self.controller.show_screen("login")
         else:
-            self.message_label.configure(text=message)
+            self.message_label.setText(message)
 
     def go_to_login(self):
         self.reset()
-        self.controller.show_screen("LoginScreen")
+        self.controller.show_screen("login")
 
     def reset(self):
-        self.username_field.delete(0, tk.END)
-        self.password_field.delete(0, tk.END)
-        self.confirm_field.delete(0, tk.END)
-        self.message_label.configure(text="")
+        self.username_field.clear()
+        self.password_field.clear()
+        self.confirm_field.clear()
+        self.message_label.setText("")
 
 
-class MainScreen(tk.Frame):
+class MainScreen(QWidget):
 
-    def __init__(self, parent, controller):
-        super().__init__(parent, bg=COLOR_BACKGROUND)
+    def __init__(self, controller):
+        super().__init__()
         self.controller = controller
         self.password_generator = PasswordGenerator()
         self.id_generator = IdGenerator()
-        self.selected_category = tk.StringVar(value=CATEGORIES[0])
-        self.category_filter = tk.StringVar(value="All")
         self.password_visible = False
         self.entries_cache = {}
 
-        top_bar = tk.Frame(self, bg=COLOR_ACCENT, height=50)
-        top_bar.pack(side="top", fill="x")
-        self.user_label = tk.Label(top_bar, text="", bg=COLOR_ACCENT, fg=COLOR_TEXT, font=("Segoe UI", 11, "bold"))
-        self.user_label.pack(side="left", padx=20, pady=12)
-        create_button(top_bar, "Logout", self.logout, 16).pack(side="right", padx=20, pady=8)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
-        body = tk.Frame(self, bg=COLOR_BACKGROUND)
-        body.pack(side="top", fill="both", expand=True, padx=20, pady=20)
+        top_bar = QFrame()
+        top_bar.setObjectName("topBar")
+        top_bar_layout = QHBoxLayout(top_bar)
+        top_bar_layout.setContentsMargins(24, 16, 24, 16)
+        self.user_label = make_label("", "userLabel")
+        top_bar_layout.addWidget(self.user_label)
+        top_bar_layout.addStretch()
+        logout_button = make_button("Logout", ghost=True, compact=True)
+        logout_button.clicked.connect(self.logout)
+        top_bar_layout.addWidget(logout_button)
+        root.addWidget(top_bar)
 
-        left_panel = tk.Frame(body, bg=COLOR_BACKGROUND, width=380)
-        left_panel.pack(side="left", fill="y", padx=(0, 20))
-        left_panel.pack_propagate(False)
+        body = QHBoxLayout()
+        body.setContentsMargins(24, 24, 24, 24)
+        body.setSpacing(24)
+        root.addLayout(body)
 
-        right_panel = tk.Frame(body, bg=COLOR_BACKGROUND)
-        right_panel.pack(side="left", fill="both", expand=True)
+        left_panel = QFrame()
+        left_panel.setObjectName("leftPanel")
+        left_panel.setFixedWidth(380)
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(24, 24, 24, 24)
+        left_layout.setSpacing(2)
+        left_layout.setAlignment(Qt.AlignTop)
 
-        self.build_left_panel(left_panel)
+        right_panel = QVBoxLayout()
+        right_panel.setSpacing(12)
+
+        body.addWidget(left_panel)
+        body.addLayout(right_panel, 1)
+
+        self.build_left_panel(left_layout)
         self.build_right_panel(right_panel)
 
-    def build_left_panel(self, parent):
-        create_label(parent, "NEW ENTRY", 13, True).pack(anchor="w", pady=(0, 15))
+    def build_left_panel(self, layout):
+        layout.addWidget(make_label("NEW ENTRY", "sectionTitle"))
+        layout.addSpacing(18)
 
-        create_label(parent, "Service / Website").pack(anchor="w")
-        self.service_field = create_field(parent, 40)
-        self.service_field.pack(anchor="w", pady=(2, 10))
+        layout.addWidget(make_label("Service or website", "fieldLabel"))
+        self.service_field = make_field()
+        layout.addWidget(self.service_field)
+        layout.addSpacing(12)
 
-        create_label(parent, "Account username").pack(anchor="w")
-        self.account_username_field = create_field(parent, 40)
-        self.account_username_field.pack(anchor="w", pady=(2, 10))
+        layout.addWidget(make_label("Account username", "fieldLabel"))
+        self.account_username_field = make_field()
+        layout.addWidget(self.account_username_field)
+        layout.addSpacing(12)
 
-        create_label(parent, "Password").pack(anchor="w")
-        password_frame = tk.Frame(parent, bg=COLOR_BACKGROUND)
-        password_frame.pack(anchor="w", pady=(2, 4), fill="x")
-        self.password_entry_field = create_field(password_frame, 32, show="*")
-        self.password_entry_field.pack(side="left")
-        create_button(password_frame, "Show", self.toggle_visibility, 10).pack(side="left", padx=(6, 0))
-        self.password_entry_field.bind("<KeyRelease>", self.evaluate_password_strength)
+        layout.addWidget(make_label("Password", "fieldLabel"))
+        password_row = QHBoxLayout()
+        password_row.setSpacing(8)
+        self.password_entry_field = make_field(password=True, object_name="passwordField")
+        self.toggle_button = make_button("Show", compact=True)
+        self.toggle_button.clicked.connect(self.toggle_visibility)
+        password_row.addWidget(self.password_entry_field, 1)
+        password_row.addWidget(self.toggle_button)
+        layout.addLayout(password_row)
 
-        self.strength_label = tk.Label(parent, text="Strength: ", bg=COLOR_BACKGROUND, fg=COLOR_TEXT, font=("Segoe UI", 9))
-        self.strength_label.pack(anchor="w", pady=(0, 10))
+        layout.addSpacing(8)
+        self.strength_bar = QProgressBar()
+        self.strength_bar.setRange(0, 7)
+        self.strength_bar.setValue(0)
+        self.strength_bar.setTextVisible(False)
+        layout.addWidget(self.strength_bar)
+        layout.addSpacing(4)
+        self.strength_label = make_label("", "fieldLabel")
+        layout.addWidget(self.strength_label)
 
-        create_label(parent, "Category").pack(anchor="w")
-        category_frame = tk.Frame(parent, bg=COLOR_BACKGROUND)
-        category_frame.pack(anchor="w", pady=(2, 10))
-        for category in CATEGORIES:
-            tk.Radiobutton(
-                category_frame,
-                text=category,
-                value=category,
-                variable=self.selected_category,
-                bg=COLOR_BACKGROUND,
-                fg=COLOR_TEXT,
-                selectcolor=COLOR_BACKGROUND,
-                activebackground=COLOR_BACKGROUND,
-                activeforeground=COLOR_TEXT,
-                font=("Segoe UI", 10),
-            ).pack(side="left", padx=(0, 15))
+        self.password_entry_field.textChanged.connect(self.evaluate_password_strength)
 
-        create_label(parent, "Unique ID").pack(anchor="w")
-        id_frame = tk.Frame(parent, bg=COLOR_BACKGROUND)
-        id_frame.pack(anchor="w", pady=(2, 15), fill="x")
-        self.id_field = create_field(id_frame, 32)
-        self.id_field.configure(state="readonly", readonlybackground=COLOR_FIELD_BACKGROUND)
-        self.id_field.pack(side="left")
-        create_button(id_frame, "New", self.generate_new_id, 10).pack(side="left", padx=(6, 0))
+        layout.addSpacing(16)
+        layout.addWidget(make_label("Category", "fieldLabel"))
+        category_row = QHBoxLayout()
+        category_row.setSpacing(18)
+        self.category_group = QButtonGroup(self)
+        for index, category in enumerate(CATEGORIES):
+            radio = QRadioButton(category)
+            if index == 0:
+                radio.setChecked(True)
+            self.category_group.addButton(radio, index)
+            category_row.addWidget(radio)
+        category_row.addStretch()
+        layout.addLayout(category_row)
 
-        separator = tk.Frame(parent, bg=COLOR_BORDER, height=1)
-        separator.pack(fill="x", pady=15)
+        layout.addSpacing(16)
+        layout.addWidget(make_label("Vault ID", "fieldLabel"))
+        id_row = QHBoxLayout()
+        id_row.setSpacing(8)
+        self.id_field = make_field(object_name="idField")
+        self.id_field.setReadOnly(True)
+        new_id_button = make_button("New", compact=True)
+        new_id_button.clicked.connect(self.generate_new_id)
+        id_row.addWidget(self.id_field, 1)
+        id_row.addWidget(new_id_button)
+        layout.addLayout(id_row)
 
-        create_label(parent, "PASSWORD GENERATOR", 13, True).pack(anchor="w", pady=(0, 10))
+        layout.addSpacing(22)
+        layout.addWidget(make_separator())
+        layout.addSpacing(22)
 
-        length_frame = tk.Frame(parent, bg=COLOR_BACKGROUND)
-        length_frame.pack(anchor="w", fill="x", pady=(0, 10))
-        create_label(length_frame, "Length").pack(side="left")
-        self.length_variable = tk.IntVar(value=20)
-        tk.Spinbox(
-            length_frame,
-            from_=8,
-            to=128,
-            textvariable=self.length_variable,
-            width=6,
-            bg=COLOR_FIELD_BACKGROUND,
-            fg=COLOR_TEXT,
-            insertbackground=COLOR_TEXT,
-            relief="flat",
-            buttonbackground=COLOR_ACCENT,
-            highlightthickness=1,
-            highlightbackground=COLOR_BORDER,
-        ).pack(side="left", padx=10)
+        layout.addWidget(make_label("PASSWORD GENERATOR", "sectionTitle"))
+        layout.addSpacing(18)
 
-        self.use_upper_var = tk.BooleanVar(value=True)
-        self.use_lower_var = tk.BooleanVar(value=True)
-        self.use_digits_var = tk.BooleanVar(value=True)
-        self.use_symbols_var = tk.BooleanVar(value=True)
+        length_row = QHBoxLayout()
+        length_row.addWidget(make_label("Length", "fieldLabel"))
+        self.length_spin = QSpinBox()
+        self.length_spin.setRange(8, 128)
+        self.length_spin.setValue(20)
+        self.length_spin.setFixedWidth(80)
+        length_row.addWidget(self.length_spin)
+        length_row.addStretch()
+        layout.addLayout(length_row)
 
-        options_frame = tk.Frame(parent, bg=COLOR_BACKGROUND)
-        options_frame.pack(anchor="w", fill="x", pady=(0, 10))
-        self.create_checkbox_option(options_frame, "Uppercase (A-Z)", self.use_upper_var).pack(anchor="w")
-        self.create_checkbox_option(options_frame, "Lowercase (a-z)", self.use_lower_var).pack(anchor="w")
-        self.create_checkbox_option(options_frame, "Digits (0-9)", self.use_digits_var).pack(anchor="w")
-        self.create_checkbox_option(options_frame, "Symbols (!@#$...)", self.use_symbols_var).pack(anchor="w")
+        layout.addSpacing(12)
+        self.use_upper_check = QCheckBox("Uppercase (A-Z)")
+        self.use_upper_check.setChecked(True)
+        self.use_lower_check = QCheckBox("Lowercase (a-z)")
+        self.use_lower_check.setChecked(True)
+        self.use_digits_check = QCheckBox("Digits (0-9)")
+        self.use_digits_check.setChecked(True)
+        self.use_symbols_check = QCheckBox("Symbols (!@#$...)")
+        self.use_symbols_check.setChecked(True)
+        for checkbox in (self.use_upper_check, self.use_lower_check, self.use_digits_check, self.use_symbols_check):
+            layout.addWidget(checkbox)
 
-        create_button(parent, "Generate a complex password", self.generate_password, 40).pack(anchor="w", pady=(5, 15))
-        create_button(parent, "Add this entry", self.add_entry, 40).pack(anchor="w", pady=(0, 5))
+        layout.addSpacing(18)
+        generate_button = make_button("Generate password", primary=True)
+        generate_button.clicked.connect(self.generate_password)
+        layout.addWidget(generate_button)
 
-        self.status_label = tk.Label(parent, text=" ", bg=COLOR_BACKGROUND, fg=COLOR_SUCCESS, font=("Segoe UI", 9), wraplength=350, justify="left")
-        self.status_label.pack(anchor="w", pady=(10, 0))
+        layout.addSpacing(8)
+        add_button = make_button("Add entry", primary=True)
+        add_button.clicked.connect(self.add_entry)
+        layout.addWidget(add_button)
 
-    def create_checkbox_option(self, parent, text, variable):
-        return tk.Checkbutton(
-            parent,
-            text=text,
-            variable=variable,
-            bg=COLOR_BACKGROUND,
-            fg=COLOR_TEXT,
-            selectcolor=COLOR_BACKGROUND,
-            activebackground=COLOR_BACKGROUND,
-            activeforeground=COLOR_TEXT,
-            font=("Segoe UI", 10),
-        )
+        layout.addSpacing(12)
+        self.status_label = make_label(" ", "fieldLabel")
+        self.status_label.setWordWrap(True)
+        layout.addWidget(self.status_label)
 
-    def build_right_panel(self, parent):
-        filter_frame = tk.Frame(parent, bg=COLOR_BACKGROUND)
-        filter_frame.pack(anchor="w", fill="x", pady=(0, 10))
-        create_label(filter_frame, "Filter by category").pack(side="left", padx=(0, 10))
-        filter_options = ("All",) + CATEGORIES
-        filter_menu = ttk.Combobox(filter_frame, textvariable=self.category_filter, values=filter_options, state="readonly", width=20)
-        filter_menu.pack(side="left")
-        filter_menu.bind("<<ComboboxSelected>>", lambda event: self.refresh_list())
+    def build_right_panel(self, layout):
+        filter_row = QHBoxLayout()
+        filter_row.addWidget(make_label("Filter by category", "fieldLabel"))
+        self.category_filter = QComboBox()
+        self.category_filter.addItems(("All",) + CATEGORIES)
+        self.category_filter.setFixedWidth(180)
+        self.category_filter.currentTextChanged.connect(lambda _: self.refresh_list())
+        filter_row.addWidget(self.category_filter)
+        filter_row.addStretch()
+        layout.addLayout(filter_row)
 
-        columns = ("service", "username", "category", "date")
-        self.tree = ttk.Treeview(parent, columns=columns, show="headings", height=18)
-        self.tree.heading("service", text="Service")
-        self.tree.heading("username", text="Username")
-        self.tree.heading("category", text="Category")
-        self.tree.heading("date", text="Date added")
-        self.tree.column("service", width=200)
-        self.tree.column("username", width=200)
-        self.tree.column("category", width=130)
-        self.tree.column("date", width=160)
-        self.tree.pack(fill="both", expand=True, pady=(0, 10))
+        self.table = QTableWidget(0, 4)
+        self.table.setHorizontalHeaderLabels(["Service", "Username", "Category", "Date added"])
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.table.verticalHeader().setVisible(False)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.table.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setAlternatingRowColors(True)
+        self.table.setShowGrid(False)
+        layout.addWidget(self.table, 1)
 
-        actions_frame = tk.Frame(parent, bg=COLOR_BACKGROUND)
-        actions_frame.pack(anchor="w", fill="x")
-        create_button(actions_frame, "Show password", self.show_selected_password, 24).pack(side="left", padx=(0, 10))
-        create_button(actions_frame, "Copy password", self.copy_selected_password, 24).pack(side="left", padx=(0, 10))
-        create_button(actions_frame, "Delete entry", self.delete_selected_entry, 24).pack(side="left")
+        self.empty_label = make_label("No entries in this vault yet", "emptyState")
+        self.empty_label.setAlignment(Qt.AlignCenter)
+        self.empty_label.setVisible(False)
+        layout.addWidget(self.empty_label)
+
+        actions_row = QHBoxLayout()
+        actions_row.setSpacing(10)
+        show_button = make_button("Show password")
+        show_button.clicked.connect(self.show_selected_password)
+        copy_button = make_button("Copy password")
+        copy_button.clicked.connect(self.copy_selected_password)
+        delete_button = make_button("Delete entry", ghost=True)
+        delete_button.clicked.connect(self.delete_selected_entry)
+        actions_row.addWidget(show_button)
+        actions_row.addWidget(copy_button)
+        actions_row.addWidget(delete_button)
+        actions_row.addStretch()
+        layout.addLayout(actions_row)
 
     def activate(self):
-        self.user_label.configure(text="Logged in as: " + self.controller.current_user["username"])
+        self.user_label.setText("Logged in as: " + self.controller.current_user["username"])
         self.reset_form()
-        self.category_filter.set("All")
+        self.category_filter.setCurrentText("All")
         self.refresh_list()
 
     def reset_form(self):
-        self.service_field.delete(0, tk.END)
-        self.account_username_field.delete(0, tk.END)
-        self.password_entry_field.delete(0, tk.END)
-        self.password_entry_field.configure(show="*")
+        self.service_field.clear()
+        self.account_username_field.clear()
+        self.password_entry_field.clear()
+        self.password_entry_field.setEchoMode(QLineEdit.Password)
+        self.toggle_button.setText("Show")
         self.password_visible = False
-        self.selected_category.set(CATEGORIES[0])
+        self.category_group.button(0).setChecked(True)
         self.generate_new_id()
-        self.strength_label.configure(text="Strength: ", fg=COLOR_TEXT)
-        self.status_label.configure(text=" ")
+        self.set_strength("", TEXT_SECONDARY, 0)
+        self.set_status(" ", TEXT_SECONDARY)
 
     def generate_new_id(self):
-        new_id = self.id_generator.generate()
-        self.id_field.configure(state="normal")
-        self.id_field.delete(0, tk.END)
-        self.id_field.insert(0, new_id)
-        self.id_field.configure(state="readonly")
+        self.id_field.setText(self.id_generator.generate())
 
     def toggle_visibility(self):
         self.password_visible = not self.password_visible
-        self.password_entry_field.configure(show="" if self.password_visible else "*")
+        self.password_entry_field.setEchoMode(QLineEdit.Normal if self.password_visible else QLineEdit.Password)
+        self.toggle_button.setText("Hide" if self.password_visible else "Show")
+
+    def selected_category(self):
+        return self.category_group.checkedButton().text()
+
+    def set_status(self, text, color):
+        self.status_label.setStyleSheet("color: " + color + ";")
+        self.status_label.setText(text)
+
+    def set_strength(self, text, color, value):
+        self.strength_label.setStyleSheet("color: " + color + ";")
+        self.strength_label.setText(text)
+        self.strength_bar.setValue(value)
+        self.strength_bar.setStyleSheet("QProgressBar::chunk { background-color: " + color + "; }")
 
     def generate_password(self):
-        length = self.length_variable.get()
+        length = self.length_spin.value()
         password = self.password_generator.generate(
             length,
-            self.use_upper_var.get(),
-            self.use_lower_var.get(),
-            self.use_digits_var.get(),
-            self.use_symbols_var.get(),
+            self.use_upper_check.isChecked(),
+            self.use_lower_check.isChecked(),
+            self.use_digits_check.isChecked(),
+            self.use_symbols_check.isChecked(),
         )
-        self.password_entry_field.configure(show="")
+        self.password_entry_field.setEchoMode(QLineEdit.Normal)
+        self.toggle_button.setText("Hide")
         self.password_visible = True
-        self.password_entry_field.delete(0, tk.END)
-        self.password_entry_field.insert(0, password)
-        self.evaluate_password_strength()
-        self.status_label.configure(text="Password generated: " + str(len(password)) + " characters", fg=COLOR_SUCCESS)
+        self.password_entry_field.setText(password)
+        self.set_status("Password generated: " + str(len(password)) + " characters", SUCCESS)
 
-    def evaluate_password_strength(self, event=None):
-        password = self.password_entry_field.get()
+    def evaluate_password_strength(self):
+        password = self.password_entry_field.text()
         score = 0
         if len(password) >= 12:
             score += 2
@@ -554,25 +907,25 @@ class MainScreen(tk.Frame):
         if any(character in PasswordGenerator.SYMBOLS for character in password):
             score += 2
         if not password:
-            self.strength_label.configure(text="Strength: ", fg=COLOR_TEXT)
+            self.set_strength("", TEXT_SECONDARY, 0)
         elif score >= 6:
-            self.strength_label.configure(text="Strength: VERY HIGH", fg=COLOR_SUCCESS)
+            self.set_strength("Strength: very high", SUCCESS, score)
         elif score >= 4:
-            self.strength_label.configure(text="Strength: HIGH", fg=COLOR_SUCCESS)
+            self.set_strength("Strength: high", SUCCESS, score)
         elif score >= 2:
-            self.strength_label.configure(text="Strength: MEDIUM", fg=COLOR_MEDIUM)
+            self.set_strength("Strength: medium", WARNING, score)
         else:
-            self.strength_label.configure(text="Strength: WEAK", fg=COLOR_ERROR)
+            self.set_strength("Strength: weak", ERROR, score)
 
     def add_entry(self):
-        service = self.service_field.get().strip()
-        account_username = self.account_username_field.get().strip()
-        password = self.password_entry_field.get()
-        category = self.selected_category.get()
-        entry_id = self.id_field.get()
+        service = self.service_field.text().strip()
+        account_username = self.account_username_field.text().strip()
+        password = self.password_entry_field.text()
+        category = self.selected_category()
+        entry_id = self.id_field.text()
 
         if not service or not account_username or not password:
-            self.status_label.configure(text="All fields must be filled in", fg=COLOR_ERROR)
+            self.set_status("All fields must be filled in", ERROR)
             return
 
         nonce, encrypted_password = CryptoEngine.encrypt(self.controller.session_key, password)
@@ -588,30 +941,40 @@ class MainScreen(tk.Frame):
             )
         except sqlite3.IntegrityError:
             self.generate_new_id()
-            self.status_label.configure(text="ID conflict, please try again", fg=COLOR_ERROR)
+            self.set_status("ID conflict, please try again", ERROR)
             return
 
         self.reset_form()
-        self.status_label.configure(text="Entry added successfully", fg=COLOR_SUCCESS)
+        self.set_status("Entry added successfully", SUCCESS)
         self.refresh_list()
 
     def refresh_list(self):
-        for row in self.tree.get_children():
-            self.tree.delete(row)
+        self.table.setRowCount(0)
         self.entries_cache = {}
-        current_filter = self.category_filter.get()
+        current_filter = self.category_filter.currentText()
         rows = self.controller.database.get_entries(self.controller.current_user["id"], current_filter)
         for entry_id, category, service, account_username, nonce, encrypted_password, creation_date in rows:
             display_date = creation_date.split("T")[0]
-            self.tree.insert("", "end", iid=entry_id, values=(service, account_username, category, display_date))
+            row_index = self.table.rowCount()
+            self.table.insertRow(row_index)
+            service_item = QTableWidgetItem(service)
+            service_item.setData(Qt.UserRole, entry_id)
+            self.table.setItem(row_index, 0, service_item)
+            self.table.setItem(row_index, 1, QTableWidgetItem(account_username))
+            self.table.setItem(row_index, 2, QTableWidgetItem(category))
+            self.table.setItem(row_index, 3, QTableWidgetItem(display_date))
             self.entries_cache[entry_id] = (nonce, encrypted_password)
+        has_entries = self.table.rowCount() > 0
+        self.table.setVisible(has_entries)
+        self.empty_label.setVisible(not has_entries)
 
     def get_selection(self):
-        selection = self.tree.selection()
-        if not selection:
-            messagebox.showwarning("No selection", "Please select an entry from the list")
+        selected_rows = self.table.selectionModel().selectedRows()
+        if not selected_rows:
+            QMessageBox.warning(self, "No selection", "Please select an entry from the list")
             return None
-        return selection[0]
+        row = selected_rows[0].row()
+        return self.table.item(row, 0).data(Qt.UserRole)
 
     def show_selected_password(self):
         entry_id = self.get_selection()
@@ -620,9 +983,9 @@ class MainScreen(tk.Frame):
         nonce, encrypted_password = self.entries_cache[entry_id]
         try:
             clear_password = CryptoEngine.decrypt(self.controller.session_key, nonce, encrypted_password)
-            messagebox.showinfo("Password", clear_password)
+            QMessageBox.information(self, "Password", clear_password)
         except InvalidTag:
-            messagebox.showerror("Error", "Unable to decrypt this entry")
+            QMessageBox.critical(self, "Error", "Unable to decrypt this entry")
 
     def copy_selected_password(self):
         entry_id = self.get_selection()
@@ -631,18 +994,22 @@ class MainScreen(tk.Frame):
         nonce, encrypted_password = self.entries_cache[entry_id]
         try:
             clear_password = CryptoEngine.decrypt(self.controller.session_key, nonce, encrypted_password)
-            self.clipboard_clear()
-            self.clipboard_append(clear_password)
-            self.status_label.configure(text="Password copied to clipboard", fg=COLOR_SUCCESS)
+            QApplication.clipboard().setText(clear_password)
+            self.set_status("Password copied to clipboard", SUCCESS)
         except InvalidTag:
-            messagebox.showerror("Error", "Unable to decrypt this entry")
+            QMessageBox.critical(self, "Error", "Unable to decrypt this entry")
 
     def delete_selected_entry(self):
         entry_id = self.get_selection()
         if entry_id is None:
             return
-        confirmation = messagebox.askyesno("Confirmation", "Permanently delete this entry?")
-        if confirmation:
+        confirmation = QMessageBox.question(
+            self,
+            "Confirmation",
+            "Permanently delete this entry?",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if confirmation == QMessageBox.Yes:
             self.controller.database.delete_entry(entry_id, self.controller.current_user["id"])
             self.refresh_list()
 
@@ -650,52 +1017,40 @@ class MainScreen(tk.Frame):
         self.controller.logout()
 
 
-class Application(tk.Tk):
+class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.title("Password Manager - AES-256 Encryption")
-        self.geometry("1100x700")
-        self.minsize(1000, 650)
-        self.configure(bg=COLOR_BACKGROUND)
-
-        style = ttk.Style()
-        style.theme_use("clam")
-        style.configure(
-            "Treeview",
-            background=COLOR_FIELD_BACKGROUND,
-            foreground=COLOR_TEXT,
-            fieldbackground=COLOR_FIELD_BACKGROUND,
-            bordercolor=COLOR_BORDER,
-            rowheight=26,
-            font=("Segoe UI", 10),
-        )
-        style.configure("Treeview.Heading", background=COLOR_ACCENT, foreground=COLOR_TEXT, font=("Segoe UI", 10, "bold"))
-        style.map("Treeview", background=[("selected", COLOR_HOVER)])
-        style.configure("TCombobox", fieldbackground=COLOR_FIELD_BACKGROUND, background=COLOR_FIELD_BACKGROUND, foreground=COLOR_TEXT, arrowcolor=COLOR_TEXT)
+        self.setWindowTitle("Vault — AES-256 Password Manager")
+        self.resize(1180, 720)
+        self.setMinimumSize(1040, 660)
 
         self.database = Database(DB_PATH)
         self.current_user = None
         self.session_key = None
 
-        container = tk.Frame(self, bg=COLOR_BACKGROUND)
-        container.pack(fill="both", expand=True)
-        container.grid_rowconfigure(0, weight=1)
-        container.grid_columnconfigure(0, weight=1)
+        self.stack = QStackedWidget()
+        self.setCentralWidget(self.stack)
 
-        self.screens = {}
-        for ScreenClass in (LoginScreen, RegisterScreen, MainScreen):
-            name = ScreenClass.__name__
-            screen = ScreenClass(container, self)
-            self.screens[name] = screen
-            screen.grid(row=0, column=0, sticky="nsew")
+        self.login_screen = LoginScreen(self)
+        self.register_screen = RegisterScreen(self)
+        self.main_screen = MainScreen(self)
 
-        self.show_screen("LoginScreen")
+        self.stack.addWidget(self.login_screen)
+        self.stack.addWidget(self.register_screen)
+        self.stack.addWidget(self.main_screen)
+
+        self.show_screen("login")
 
     def show_screen(self, name):
-        screen = self.screens[name]
-        screen.tkraise()
-        if name == "MainScreen":
+        mapping = {
+            "login": self.login_screen,
+            "register": self.register_screen,
+            "main": self.main_screen,
+        }
+        screen = mapping[name]
+        self.stack.setCurrentWidget(screen)
+        if name == "main":
             screen.activate()
 
     def register(self, username, password):
@@ -725,16 +1080,19 @@ class Application(tk.Tk):
             return False, "Incorrect username or password"
         self.current_user = {"id": user_id, "username": name}
         self.session_key = key
-        self.show_screen("MainScreen")
+        self.show_screen("main")
         return True, "Login successful"
 
     def logout(self):
         self.current_user = None
         self.session_key = None
-        self.screens["LoginScreen"].reset()
-        self.show_screen("LoginScreen")
+        self.login_screen.reset()
+        self.show_screen("login")
 
 
 if __name__ == "__main__":
-    application = Application()
-    application.mainloop()
+    application = QApplication(sys.argv)
+    application.setStyleSheet(STYLE_SHEET)
+    window = MainWindow()
+    window.show()
+    sys.exit(application.exec())
