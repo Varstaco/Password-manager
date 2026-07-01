@@ -1,25 +1,27 @@
-# Password Manager
+# Vault - Password Manager
 
-A secure desktop password manager developed in Python using Tkinter for the graphical interface, SQLite for local storage, and AES-256-GCM encryption to securely protect user passwords.
+Vault is a secure desktop password manager developed in Python with a modern graphical interface powered by PySide6. It allows users to securely store, generate, manage, and retrieve passwords using strong cryptographic standards.
 
-The application allows users to create an account secured by a master password, generate strong passwords, and safely store encrypted credentials locally.
+All passwords are encrypted locally using AES-256-GCM, while the master password is protected through PBKDF2-HMAC-SHA256 key derivation. No sensitive information is stored in plaintext.
 
 ---
 
 ## Features
 
-- User registration and authentication
+- Secure user registration and authentication
 - Master password protection
-- AES-256-GCM password encryption
+- AES-256-GCM encryption
 - PBKDF2-HMAC-SHA256 key derivation
-- Secure local SQLite database
-- Password generator with customizable options
-- Password strength indicator
-- Copy passwords to the clipboard
-- Show or hide stored passwords
+- Local SQLite database
+- Modern desktop interface built with PySide6
+- Secure password generator
+- Password strength evaluation
+- Password visibility toggle
+- Copy passwords to clipboard
+- Category filtering (Personal / Professional)
+- Unique Vault ID generated for every entry
 - Delete stored credentials
-- Personal and Professional categories
-- Unique ID generation for each entry
+- Automatic session management
 
 ---
 
@@ -29,23 +31,38 @@ The application allows users to create an account secured by a master password, 
 
 - Python 3.10 or newer
 
-### Required package
+### Required packages
+
+Install the required dependency with:
 
 ```bash
-pip install cryptography
+pip install cryptography PySide6
+```
+
+or
+
+```bash
+pip install -r requirements.txt
+```
+
+### requirements.txt
+
+```text
+cryptography
+PySide6
 ```
 
 ### Standard libraries
 
-The following libraries are included with Python and do not require installation:
+The following modules are included with Python:
 
-- tkinter
 - sqlite3
 - os
-- datetime
+- sys
 - secrets
 - string
 - time
+- datetime
 
 ---
 
@@ -54,22 +71,22 @@ The following libraries are included with Python and do not require installation
 Clone the repository:
 
 ```bash
-git clone https://github.com/yourusername/password-manager.git
+git clone https://github.com/yourusername/vault-password-manager.git
 ```
 
-Go to the project directory:
+Move into the project directory:
 
 ```bash
-cd password-manager
+cd vault-password-manager
 ```
 
-Install the dependency:
+Install dependencies:
 
 ```bash
-pip install cryptography
+pip install -r requirements.txt
 ```
 
-Run the application:
+Launch the application:
 
 ```bash
 python main.py
@@ -79,74 +96,74 @@ python main.py
 
 ## How It Works
 
-### 1. Account Creation
+### User Registration
 
-When a user creates an account:
+When creating an account:
 
 - A random 16-byte salt is generated.
-- The master password is transformed into a 256-bit encryption key using PBKDF2-HMAC-SHA256 with **390,000 iterations**.
-- A verification string is encrypted using this key.
-- The salt and encrypted verification value are stored inside the SQLite database.
+- The master password is transformed into a 256-bit key using PBKDF2-HMAC-SHA256 with **390,000 iterations**.
+- A verification string is encrypted with AES-256-GCM.
+- Only the encrypted verification value and salt are stored.
 
-The master password itself is **never stored**.
+The master password is never saved in the database.
 
 ---
 
-### 2. Login
+### Authentication
 
-When logging in:
+During login:
 
 - The user's salt is retrieved.
-- The entered password is used to derive a new encryption key.
+- The encryption key is derived again from the entered password.
 - The verification value is decrypted.
-- If decryption succeeds, the user is authenticated and the encryption key is kept only for the current session.
+- If the verification succeeds, the user is authenticated and the encryption key is stored only for the current session.
 
 ---
 
-### 3. Password Storage
+### Password Encryption
 
 Each password is encrypted individually using:
 
 - AES-256-GCM
-- A unique random nonce
+- A unique random 12-byte nonce
 
-Only encrypted passwords are stored in the database.
+Every stored credential has its own encryption nonce.
 
 ---
 
-### 4. Password Retrieval
+### Password Retrieval
 
 When a password is requested:
 
-- The encrypted password and its nonce are loaded.
-- They are decrypted using the current session key.
-- The plaintext password is displayed or copied to the clipboard.
+- The encrypted data is loaded from the database.
+- AES-256-GCM decrypts the password using the active session key.
+- The password can either be displayed or copied directly to the clipboard.
 
 ---
 
 ## Password Generator
 
-The integrated password generator allows users to customize:
+The built-in password generator supports:
 
-- Password length
+- Custom password length (8–128 characters)
 - Uppercase letters
 - Lowercase letters
 - Numbers
 - Special characters
 
-The generator uses Python's `secrets` module for cryptographically secure randomness.
+Random values are generated using Python's `secrets` module.
 
 ---
 
-## Password Strength
+## Password Strength Meter
 
-The application evaluates password strength based on:
+The application evaluates password strength using:
 
 - Password length
-- Uppercase letters
-- Lowercase letters
-- Digits
-- Special characters
+- Uppercase characters
+- Lowercase characters
+- Numbers
+- Symbols
 
 Possible ratings:
 
@@ -157,14 +174,29 @@ Possible ratings:
 
 ---
 
+## Vault Entries
+
+Each stored credential contains:
+
+- Unique Vault ID
+- Category
+- Service name
+- Account username
+- Encrypted password
+- Creation date
+
+Entries can be filtered by category directly from the interface.
+
+---
+
 ## Database Structure
 
 ### users
 
 | Column | Description |
-|---------|-------------|
-| id | User ID |
-| username | Username |
+|----------|-------------|
+| id | User identifier |
+| username | Account username |
 | salt | Random salt |
 | verification_nonce | AES nonce |
 | verification_ciphertext | Encrypted verification value |
@@ -173,49 +205,38 @@ Possible ratings:
 ### entries
 
 | Column | Description |
-|---------|-------------|
-| id | Unique entry ID |
+|----------|-------------|
+| id | Unique Vault ID |
 | user_id | Owner |
 | category | Personal or Professional |
-| service | Website or service |
+| service | Service name |
 | account_username | Account username |
 | nonce | AES nonce |
 | encrypted_password | Encrypted password |
-| creation_date | Entry creation date |
+| creation_date | Creation date |
 
 ---
 
 ## Security
 
-This project implements several security mechanisms:
+Vault implements multiple security mechanisms:
 
 - AES-256-GCM authenticated encryption
-- PBKDF2-HMAC-SHA256 key derivation
+- PBKDF2-HMAC-SHA256
 - 390,000 PBKDF2 iterations
 - Random salt generation
 - Random nonce generation
-- Secure password generation using the `secrets` module
+- Secure random password generation
+- Local encrypted storage
 - Master password is never stored
-- Encrypted local password storage
+- Authentication based on encrypted verification data
 
 ---
 
-## Project Structure
-
-```
-project/
-│
-├── main.py
-├── vault.db
-└── README.md
-```
-
----
-
-## Technologies Used
+## Technologies
 
 - Python
-- Tkinter
+- PySide6
 - SQLite
 - Cryptography
 - AES-256-GCM
@@ -223,11 +244,43 @@ project/
 
 ---
 
+## Project Structure
+
+```
+vault-password-manager/
+│
+├── main.py
+├── README.md
+├── requirements.txt
+├── LICENSE
+├── .gitignore
+├── screenshots/
+└── vault.db (generated automatically)
+```
+
+---
+
+## Screenshots
+
+Add screenshots of the application inside the `screenshots` folder.
+
+Example:
+
+```
+screenshots/
+├── login.png
+├── register.png
+├── dashboard.png
+└── generator.png
+```
+
+---
+
 ## Notes
 
-This project stores all data locally. No passwords or personal information are transmitted over the internet.
-
-The database (`vault.db`) is automatically created on first launch.
+- The SQLite database (`vault.db`) is automatically created when the application is launched for the first time.
+- All data remains on the local machine.
+- No passwords or user information are transmitted over the internet.
 
 ---
 
